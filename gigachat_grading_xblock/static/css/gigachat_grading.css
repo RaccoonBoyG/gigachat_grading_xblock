@@ -1,0 +1,9 @@
+/* CSS for GigaChatGradingXBlock */
+
+.gigachat_grading_block .count {
+    font-weight: bold;
+}
+
+.gigachat_grading_block p {
+    cursor: pointer;
+}
