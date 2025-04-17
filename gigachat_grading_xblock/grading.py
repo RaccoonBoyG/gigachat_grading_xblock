@@ -13,7 +13,7 @@ import tempfile
 import os
 import logging
 
-from gigachat import client # требуется установить библиотеку: pip install openai
+from gigachat import client, GigaChat # требуется установить библиотеку: pip install openai
 
 # Для чтения PDF и DOCX используются библиотеки, их установка:
 # pip install PyPDF2 python-docx
@@ -228,13 +228,13 @@ class GigaChatAIGradingXBlock(XBlock):
         """
         GIGACHAT_AUTH_KEY = getattr(settings,'GIGACHAT_AUTH_KEY', "")
         auth_key = GIGACHAT_AUTH_KEY
-        clientmy = client(credentials=auth_key,verify_ssl_certs=False, scope="GIGACHAT_API_PERS", model="GigaChat-Lite")
+        client = GigaChat(credentials=auth_key,verify_ssl_certs=False, scope="GIGACHAT_API_PERS", model="GigaChat-Lite")
 
         # Соединение промта и текста работы
         full_prompt = prompt + "\n\nТекст работы:\n" + text
         
         try:
-            response = clientmy.chat(
+            response = client.chat(
                 messages=[
                     {"role": "system", "content": "Вы — помощник для оценки учебных работ."},
                     {"role": "user", "content": full_prompt}
