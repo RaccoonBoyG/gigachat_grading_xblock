@@ -1,0 +1,4 @@
+gigachat
+PyPDF2
+python-docx
+XBlock

@@ -1,5 +1,7 @@
 from setuptools import setup, find_packages
 import os
+from pip.req import parse_requirements
+
 
 def package_data(pkg, roots):
     """Generic function to find package_data.
@@ -16,6 +18,12 @@ def package_data(pkg, roots):
 
     return {pkg: data}
 
+# parse_requirements() returns generator of pip.req.InstallRequirement objects
+install_reqs = parse_requirements('./requirements.txt')
+
+# reqs is a list of requirement
+# e.g. ['django==1.5.1', 'mezzanine==1.4.6']
+reqs = [str(ir.req) for ir in install_reqs]
 
 
 setup(
