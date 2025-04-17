@@ -1,4 +1,4 @@
-gigachat
+gigachat @ git+https://github.com/ai-forever/gigachat@v0.1.39post1
 PyPDF2
 python-docx
 XBlock
