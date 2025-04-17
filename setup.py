@@ -1,6 +1,5 @@
 from setuptools import setup, find_packages
 import os
-from pip.req import parse_requirements
 
 
 def package_data(pkg, roots):
@@ -18,26 +17,15 @@ def package_data(pkg, roots):
 
     return {pkg: data}
 
-# parse_requirements() returns generator of pip.req.InstallRequirement objects
-install_reqs = parse_requirements('./requirements.txt')
-
-# reqs is a list of requirement
-# e.g. ['django==1.5.1', 'mezzanine==1.4.6']
-reqs = [str(ir.req) for ir in install_reqs]
-
+with open('requirements.txt') as f:
+    required = f.read().splitlines()
 
 setup(
     name='gigachat_grading_xblock',
     version='0.1',
     description='XBlock для проверки работ с помощью gigachat API',
     packages=find_packages(),
-    install_requires=[
-        'gigachat',
-        'PyPDF2',
-        'python-docx',
-        'XBlock'
-        # другие зависимости, если нужны
-    ],
+    install_requires=required,
     entry_points={
         'xblock.v1': [
             'gigachat_grading_xblock = gigachat_grading_xblock.grading:GigaChatAIGradingXBlock',
