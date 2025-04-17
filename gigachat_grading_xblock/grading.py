@@ -226,7 +226,8 @@ class GigaChatAIGradingXBlock(XBlock):
         """
         Отправка текста с дополнительным промтом в GigaChat API для получения оценки.
         """
-        auth_key = settings.FEATURES.get("GIGACHAT_AUTH_KEY", "")
+        GIGACHAT_AUTH_KEY = getattr(settings,'GIGACHAT_AUTH_KEY', "")
+        auth_key = GIGACHAT_AUTH_KEY
         clientmy = client(credentials=auth_key,verify_ssl_certs=False, scope="GIGACHAT_API_PERS", model="GigaChat-Lite")
 
         # Соединение промта и текста работы
