@@ -13,7 +13,7 @@ import tempfile
 import os
 import logging
 
-from gigachat import client, GigaChat # требуется установить библиотеку: pip install openai
+from gigachat import GigaChat # требуется установить библиотеку: pip install openai
 
 # Для чтения PDF и DOCX используются библиотеки, их установка:
 # pip install PyPDF2 python-docx
@@ -23,13 +23,16 @@ import docx
 
 from xblock.core import XBlock
 from xblock.fields import Scope, String, Float, Dict
-from xblock.fragment import Fragment
 from django.conf import settings
+from web_fragments.fragment import Fragment
+from gigachat_grading_xblock.utils import render_template
+from xblockutils.studio_editable import StudioEditableXBlockMixin
 
 log = logging.getLogger(__name__)
 
 
-class GigaChatAIGradingXBlock(XBlock):
+class GigaChatAIGradingXBlock(StudioEditableXBlockMixin, XBlock):
+    editable_fields = ('grading_prompt', 'overridden_score', 'overridden_comment')
     """
     XBlock для проверки работ с помощью OpenAI API.
     """
@@ -71,109 +74,45 @@ class GigaChatAIGradingXBlock(XBlock):
         default="",
         scope=Scope.content
     )
-
+    
     def student_view(self, context=None):
-        """
-        Основной интерфейс для студента: форма загрузки файла.
-        """
-        html = """
-            <div>
-                <h3>Проверка работы с помощью OpenAI</h3>
-                <p>Загрузите свой файл (PDF или DOCX) для автоматической проверки.</p>
-                <form id="upload_form" method="post" enctype="multipart/form-data">
-                    <input name="uploaded_file" id="uploaded_file" type="file"/>
-                    <br/><br/>
-                    <button type="button" onclick="submitFile()">Отправить на проверку</button>
-                </form>
-                <div id="result"></div>
-            </div>
+        html = self.resource_string("static/html/student-view.html")
+        frag = Fragment(html.format(self=self))
+        frag.add_css(self.resource_string("static/css/student-view.css"))
+        frag.add_javascript(self.resource_string("static/js/src/gigachat_grading.js"))
+        frag.initialize_js('GigaChatGradingXBlock')
+        return frag
 
-            <script>
-                function submitFile(){
-                    var formData = new FormData();
-                    var fileInput = document.getElementById('uploaded_file');
-                    if (fileInput.files.length == 0) {
-                        alert("Пожалуйста, выберите файл для загрузки");
-                        return;
-                    }
-                    formData.append("uploaded_file", fileInput.files[0]);
+    # def student_view(self, context=None):
+    #     """
+    #     Основной интерфейс для студента: форма загрузки файла.
+    #     """
+    #     html = self.resource_string("static/html/openai_grading.html")
+    #     fragment = Fragment(html)
+    #     fragment.add_javascript(self.resource_string("static/js/src/gigachat_grading.js"))
+    #     fragment.initialize_js("GigaChatGradingXBlock")
+    #     fragment.add_css("""
+    #         div { font-family: Arial, sans-serif; }
+    #         pre { background: #f8f8f8; padding: 10px; border: 1px solid #ccc; }
+    #     """)
+    #     return fragment
 
-                    var xhr = new XMLHttpRequest();
-                    xhr.open("POST", runtime.handlerUrl(element, 'handle_upload'));
-                    xhr.onload = function(){
-                        if(xhr.status === 200){
-                            document.getElementById("result").innerHTML = "<pre>" + xhr.responseText + "</pre>";
-                        } else {
-                            document.getElementById("result").innerHTML = "Ошибка при обработке файла.";
-                        }
-                    };
-                    xhr.send(formData);
-                }
-            </script>
-        """
-        fragment = Fragment(html)
-        fragment.add_css("""
-            /* Простейшие стили */
-            div { font-family: Arial, sans-serif; }
-            pre { background: #f8f8f8; padding: 10px; border: 1px solid #ccc; }
-        """)
-        return fragment
+    # def studio_view(self, context=None):
+    #     """
+    #     Редактор для преподавателя, в котором можно задать промт и установить/изменить оценку.
+    #     """
+    #     context = {
+    #         "grading_prompt": self.grading_prompt,
+    #         "overridden_score": self.overridden_score if self.overridden_score is not None else "",
+    #         "overridden_comment": self.overridden_comment
+    #     }
+    #     html = render_template("studio-view.html", **context)
 
-    def studio_view(self, context=None):
-        """
-        Редактор для преподавателя, в котором можно задать промт и установить/изменить оценку.
-        """
-        html = """
-            <div>
-                <h3>Настройки проверки работы</h3>
-                <form id="studio_form">
-                    <label for="grading_prompt">Промт проверки:</label><br/>
-                    <textarea id="grading_prompt" name="grading_prompt" rows="10" cols="80">{grading_prompt}</textarea><br/><br/>
-                    
-                    <label for="overridden_score">Оценка (0-1):</label><br/>
-                    <input type="number" id="overridden_score" name="overridden_score" min="0" max="1" step="0.01" value="{overridden_score}" /><br/><br/>
-                    
-                    <label for="overridden_comment">Комментарий:</label><br/>
-                    <textarea id="overridden_comment" name="overridden_comment" rows="5" cols="80">{overridden_comment}</textarea><br/><br/>
-                    
-                    <button type="button" onclick="saveStudioSettings()">Сохранить</button>
-                </form>
-                
-                <script>
-                    function saveStudioSettings(){
-                        var data = {
-                            grading_prompt: document.getElementById('grading_prompt').value,
-                            overridden_score: document.getElementById('overridden_score').value,
-                            overridden_comment: document.getElementById('overridden_comment').value
-                        };
-                        var xhr = new XMLHttpRequest();
-                        xhr.open("POST", runtime.handlerUrl(element, 'studio_submit'));
-                        xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-                        xhr.onload = function(){
-                            if(xhr.status === 200){
-                                alert("Настройки успешно сохранены");
-                            } else {
-                                alert("Ошибка при сохранении настроек");
-                            }
-                        };
-                        xhr.send(JSON.stringify(data));
-                    }
-                </script>
-            </div>
-        """
-        # Форматируем шаблон, подставляя текущие значения
-        html = html.format(
-            grading_prompt=self.grading_prompt,
-            overridden_score=self.overridden_score if self.overridden_score is not None else "",
-            overridden_comment=self.overridden_comment
-        )
-        fragment = Fragment(html)
-        fragment.add_css("""
-            /* Простые стили для интерфейса преподавателя */
-            label { font-weight: bold; }
-            textarea, input { width: 100%; }
-        """)
-        return fragment
+    #     # Форматируем шаблон, подставляя текущие значения
+    #     fragment = Fragment(html)
+        # fragment.add_javascript(self.resource_string("static/js/src/gigachat_grading.js"))
+        # fragment.initialize_js("GigaChatGradingXBlock")
+    #     return fragment
 
     def extract_text_from_file(self, file_path, file_extension):
         """
@@ -195,32 +134,6 @@ class GigaChatAIGradingXBlock(XBlock):
         except Exception as e:
             log.error("Ошибка при извлечении текста: %s", e)
         return text
-
-    # def call_openai_api(self, text, prompt):
-    #     """
-    #     Отправка текста с дополнительным промтом в OpenAI API для получения оценки.
-    #     В данном примере используется ChatGPT API. Настройте ключ API и другие параметры.
-    #     """
-    #     # Объединяем тему проверки и текст файла
-    #     full_prompt = prompt + "\n\nТекст работы:\n" + text
-
-    #     try:
-    #         response = openai.ChatCompletion.create(
-    #             model="gpt-3.5-turbo",  # или другой используемый вариант
-    #             messages=[
-    #                 {"role": "system", "content": "Вы — помощник для оценки учебных работ."},
-    #                 {"role": "user", "content": full_prompt}
-    #             ],
-    #             temperature=0.2,
-    #             max_tokens=500
-    #         )
-    #         reply = response.choices[0].message.content.strip()
-    #         # Попытка распарсить ответ как JSON
-    #         result_obj = json.loads(reply)
-    #         return result_obj
-    #     except Exception as e:
-    #         log.error("Ошибка при вызове OpenAI API: %s", e)
-    #         return {"score": 0, "comment": "Ошибка при обработке работы: " + str(e)}
 
     def call_giga_chat_api(self, text, prompt):
         """
@@ -312,30 +225,30 @@ class GigaChatAIGradingXBlock(XBlock):
             return {"error": str(e)}
 
     # Функция для отладки, вызываемая при просмотре состояния XBlock
-    def student_debug_view(self, context=None):
-        html = "<div><pre>{}</pre></div>".format(json.dumps({
-            "grading_prompt": self.grading_prompt,
-            "result": self.result,
-            "overridden_score": self.overridden_score,
-            "overridden_comment": self.overridden_comment
-        }, indent=2))
-        frag = Fragment(html)
-        return frag
-
+    def resource_string(self, path):
+        import pkg_resources
+        data = pkg_resources.resource_string(__name__, path)
+        return data.decode("utf8")
+    
     @staticmethod
     def workbench_scenarios():
         """A canned scenario for display in the workbench."""
         return [
-            ("GigaChatAIGradingXBlock",
-             """<gigachat_grading_xblock/>
-             """),
-            ("Multiple GigaChatAIGradingXBlock",
-             """<vertical_demo>
-                <gigachat_grading_xblock/>
-                <gigachat_grading_xblock/>
-                <gigachat_grading_xblock/>
+            (
+                "GigaChatAIGradingXBlock",
+                """
+                <GigaChat/>
+                """,
+            ),
+            (
+                "Multiple GigaChatAIGradingXBlock",
+                """<vertical_demo>
+                    <GigaChat/>
+                    <GigaChat/>
+                    <GigaChat/>
                 </vertical_demo>
-             """),
+             """,
+            ),
         ]
 # def _test_xblock():
 #     """

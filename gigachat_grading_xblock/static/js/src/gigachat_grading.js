@@ -1,22 +1,27 @@
-/* Javascript for GigaChatGradingXBlock. */
 function GigaChatGradingXBlock(runtime, element) {
-
-    function updateCount(result) {
-        $('.count', element).text(result.count);
+  $('#essay-upload-form', element).submit(function (event) {
+    event.preventDefault();
+    var formData = new FormData();
+    var fileInput = $('#essay-file', element)[0];
+    if (fileInput.files.length === 0) {
+      alert('Пожалуйста, выберите файл.');
+      return;
     }
+    formData.append('essay_file', fileInput.files[0]);
 
-    var handlerUrl = runtime.handlerUrl(element, 'increment_count');
-
-    $('p', element).click(function(eventObject) {
-        $.ajax({
-            type: "POST",
-            url: handlerUrl,
-            data: JSON.stringify({"hello": "world"}),
-            success: updateCount
-        });
+    $.ajax({
+      url: runtime.handlerUrl(element, 'grade_submission'),
+      type: 'POST',
+      data: formData,
+      processData: false,
+      contentType: false,
+      success: function (response) {
+        $('#score', element).text(response.score);
+        $('#comment', element).text(response.comment);
+      },
+      error: function () {
+        alert('Произошла ошибка при отправке файла.');
+      },
     });
-
-    $(function ($) {
-        /* Here's where you'd do things on page load. */
-    });
+  });
 }
