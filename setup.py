@@ -19,7 +19,7 @@ def package_data(pkg, roots):
 
 
 setup(
-    name='gigachat-grading-xblock',
+    name='gigachat_grading_xblock',
     version='0.1',
     description='XBlock для проверки работ с помощью gigachat API',
     packages=find_packages(),
