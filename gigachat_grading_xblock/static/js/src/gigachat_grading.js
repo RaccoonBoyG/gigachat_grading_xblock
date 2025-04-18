@@ -1,30 +1,52 @@
-function GigaChatGradingXBlock(runtime, element) {
-  // Обработчик клика по кнопке отправки
-  $('.submit-button', element).on('click', function (event) {
+function GigaChatAIGradingXBlock(runtime, element) {
+  // Клик по кастомной кнопке отправки
+  $('#submit-button', element).on('click', function (event) {
     event.preventDefault();
 
-    var fileInput = $('#essay-file', element)[0];
+    var fileInput = $('#file-input', element)[0];
     if (!fileInput || fileInput.files.length === 0) {
-      alert('Пожалуйста, выберите файл.');
+      alert('Выберите файл для загрузки.');
       return;
     }
 
     var formData = new FormData();
-    formData.append('essay_file', fileInput.files[0]);
+    formData.append('file', fileInput.files[0]);
 
     $.ajax({
-      url: runtime.handlerUrl(element, 'grade_submission'),
+      url: runtime.handlerUrl(element, 'handle_upload'),
       type: 'POST',
       data: formData,
-      processData: false, // Не преобразовывать данные в строку запроса
-      contentType: false, // Не устанавливать заголовок Content-Type
+      processData: false,
+      contentType: false,
       success: function (response) {
         $('#score', element).text(response.score);
         $('#comment', element).text(response.comment);
-        $('#grading-result', element).show();
+        $('#result', element).show();
       },
       error: function () {
-        alert('Произошла ошибка при отправке файла.');
+        alert('Ошибка при отправке файла.');
+      },
+    });
+  });
+
+  // Сохранение изменений в режиме Studio
+  $('#save-button', element).on('click', function (event) {
+    event.preventDefault();
+    var data = {
+      prompt: $('#prompt', element).val(),
+      weight: $('#weight', element).val(),
+      // поля оценки/комментария и approve собираются внутри handle_override
+    };
+    $.ajax({
+      url: runtime.handlerUrl(element, 'handle_override'),
+      type: 'POST',
+      data: JSON.stringify(data),
+      contentType: 'application/json',
+      success: function () {
+        alert('Настройки сохранены');
+      },
+      error: function () {
+        alert('Ошибка при сохранении настроек.');
       },
     });
   });

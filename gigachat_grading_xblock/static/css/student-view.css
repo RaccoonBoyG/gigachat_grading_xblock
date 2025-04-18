@@ -1,52 +1,58 @@
-/* Основной контейнер */
-.grading-xblock {
-  font-family: 'Segoe UI', sans-serif;
-  padding: 20px;
-  border: 1px solid #ddd !important;
-  border-radius: 6px;
-  max-width: 600px;
-  margin: 0 auto;
+/* 1. Определяем переменные бренда (Indigo theme) */
+:root {
+  --brand-primary: #005a9c; /* Indigo primary */
+  --brand-secondary: #f8c117; /* Акцентный жёлтый */
+  --color-bg: #ffffff; /* Фоновый цвет */
+  --color-text: #212121; /* Основной текст */
+  --font-sans: 'Open Sans', sans-serif;
 }
 
-/* Заголовок */
-.grading-xblock h2 {
-  font-size: 24px;
-  color: #2c3e50;
-  margin-bottom: 20px;
+/* 2. Общие стили блока */
+.grading-block {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  padding: var(--spacing-4, 1rem); /* Paragon spacing token */
+  border-radius: var(--border-radius, 0.25rem);
+  border: 1px solid var(--color-300, #e0e0e0);
 }
 
-/* Форма загрузки */
-#essay-upload-form {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+/* 3. Заголовок */
+.grading-block__title {
+  font-size: var(--font-size-3, 1.25rem);
+  margin-bottom: var(--spacing-3, 0.75rem);
 }
 
-/* Поле выбора файла */
-#essay-file {
-  padding: 10px;
-  border: 2px solid #bdc3c7 !important;
-  border-radius: 4px;
-  background-color: #ffffff !important;
-  font-size: 16px;
-  transition: border-color 0.3s;
+/* 4. Кнопка отправки: используем стандартные Paragon/Bootstrap классы + переменные */
+.grading-block__submit-button {
+  display: inline-block;
+  padding: var(--spacing-2, 0.5rem) var(--spacing-4, 1rem);
+  font-size: var(--font-size-2, 1rem);
+  color: var(--brand-primary);
+  background-color: transparent;
+  border: 1px solid var(--brand-primary);
+  border-radius: var(--border-radius, 0.25rem);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-#essay-file:focus {
-  border-color: #0075b4 !important;
-  outline: none;
+.grading-block__submit-button:hover,
+.grading-block__submit-button:focus {
+  background-color: var(--brand-primary);
+  color: #ffffff;
 }
 
-/* Результаты оценки */
-#grading-result {
-  margin-top: 25px;
-  padding: 15px;
-  background-color: #ecf0f1 !important;
-  border-radius: 4px;
-  color: #2c3e50;
+/* 5. Результаты */
+.grading-block__result {
+  margin-top: var(--spacing-4, 1rem);
+  padding: var(--spacing-3, 0.75rem);
+  background-color: var(--color-100, #f5f5f5);
+  border-radius: var(--border-radius, 0.25rem);
 }
 
-#grading-result p {
-  margin: 10px 0;
-  font-size: 16px;
+.grading-block__score,
+.grading-block__comment {
+  margin: var(--spacing-1, 0.25rem) 0;
+  font-size: var(--font-size-2, 1rem);
 }

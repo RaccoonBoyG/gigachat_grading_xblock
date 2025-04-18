@@ -1,15 +1,24 @@
-<div class="grading-xblock">
-  <div class="file-upload">
-    <input type="file" id="essay-file" name="essay_file" required>
+<div class="grading-block">
+  <h2 class="grading-block__title">Загрузка работы</h2>
+  <div class="grading-block__file-input p-2">
+    <input
+      type="file"
+      id="file-input"
+      name="file"
+      required
+      class="grading-block__input"
+    >
   </div>
-  <span class="submit-attempt-container">
-  <a type="button" class="submit btn-brand" data-submitting="Отправка" data-value="Отправить" data-should-enable-submit-button="True">
-          <span class="submit-label">Отправить</span>
-      </a>
-    <a href="#" class="btn btn-inverse-outline-primary" id="submit-button">Отправить</a>
-  </span>
-  <div id="grading-result" style="display: none;">
-    <p>Оценка: <span id="score"></span></p>
-    <p>Комментарий: <span id="comment"></span></p>
+  <div class="grading-block__actions p-2">
+    <a href="#"
+       class="btn btn-outline-primary grading-block__submit-button"
+       id="submit-button"
+    >
+      Отправить
+    </a>
+  </div>
+  <div class="grading-block__result" id="result" style="">
+    <p class="grading-block__score">Оценка: <span id="score"></span></p>
+    <p class="grading-block__comment">Комментарий: <span id="comment"></span></p>
   </div>
 </div>

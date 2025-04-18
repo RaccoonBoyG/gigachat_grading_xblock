@@ -27,12 +27,14 @@ from django.conf import settings
 from web_fragments.fragment import Fragment
 from gigachat_grading_xblock.utils import render_template
 from xblockutils.studio_editable import StudioEditableXBlockMixin
+from .utils import upload_pdf_to_gigachat
+from webob import Response
 
 log = logging.getLogger(__name__)
 
-
+@XBlock.needs('user')
 class GigaChatAIGradingXBlock(StudioEditableXBlockMixin, XBlock):
-    editable_fields = ('overridden_score', 'overridden_comment')
+    editable_fields = ('display_name', 'grade_weight', 'auth_key')
     """
     XBlock для проверки работ с помощью OpenAI API.
     """
@@ -74,162 +76,79 @@ class GigaChatAIGradingXBlock(StudioEditableXBlockMixin, XBlock):
         default="",
         scope=Scope.content
     )
-    
+    display_name = String(display_name="Оценивание преподавателем", default="Оценивание преподавателем", scope=Scope.settings)
+    submissions = Dict(help="Все ответы студентов", default={}, scope=Scope.settings)
+    grade_weight = Float(help="Weight of this component (0-1)", default=1.0, scope=Scope.content)
+    auth_key = String(help="Ключ от нейросети", default="", scope=Scope.settings)
+
     def student_view(self, context=None):
+        # проверка по Runtime API
+        is_staff = getattr(self.runtime, 'user_is_staff', False)
+        # if not is_staff:
+            # обычный студент — загрузка файла
         html = self.resource_string("static/html/student-view.html")
+        # else:
+            # преподаватель — интерфейс проверки
+            # html = self.resource_string("static/html/staff-view.html")
         frag = Fragment(html.format(self=self))
         frag.add_css(self.resource_string("static/css/student-view.css"))
         frag.add_javascript(self.resource_string("static/js/src/gigachat_grading.js"))
-        frag.initialize_js('GigaChatGradingXBlock')
+        frag.initialize_js('GigaChatAIGradingXBlock')
         return frag
 
-    # def student_view(self, context=None):
-    #     """
-    #     Основной интерфейс для студента: форма загрузки файла.
-    #     """
-    #     html = self.resource_string("static/html/openai_grading.html")
-    #     fragment = Fragment(html)
-    #     fragment.add_javascript(self.resource_string("static/js/src/gigachat_grading.js"))
-    #     fragment.initialize_js("GigaChatGradingXBlock")
-    #     fragment.add_css("""
-    #         div { font-family: Arial, sans-serif; }
-    #         pre { background: #f8f8f8; padding: 10px; border: 1px solid #ccc; }
-    #     """)
-    #     return fragment
-
-    # def studio_view(self, context=None):
-    #     """
-    #     Редактор для преподавателя, в котором можно задать промт и установить/изменить оценку.
-    #     """
-    #     context = {
-    #         "grading_prompt": self.grading_prompt,
-    #         "overridden_score": self.overridden_score if self.overridden_score is not None else "",
-    #         "overridden_comment": self.overridden_comment
-    #     }
-    #     html = render_template("studio-view.html", **context)
-
-    #     # Форматируем шаблон, подставляя текущие значения
-    #     fragment = Fragment(html)
-        # fragment.add_javascript(self.resource_string("static/js/src/gigachat_grading.js"))
-        # fragment.initialize_js("GigaChatGradingXBlock")
-    #     return fragment
-
-    def extract_text_from_file(self, file_path, file_extension):
-        """
-        Функция извлекает текст из файла по типу.
-        """
-        text = ""
+    @XBlock.handler
+    def handle_upload(self, request, suffix=''):
+        user = self.get_real_user()
+        student = user.username
+        uploaded = request.params.get('file')
+        if not uploaded:
+            return Response(json_body={'error': 'No file uploaded.'}, status=400)
+        # save to temp
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
+        tmp.file.write(uploaded.file.read())
+        tmp.close()
+        # grade via GigaChat
+        log.warning(self.auth_key)
+        log.warning(tmp.name)
+        log.warning("!!!!!!!!!!!!!!!!!!!!!")
+        raw = upload_pdf_to_gigachat(self.auth_key, tmp.name, self.grading_prompt)
         try:
-            if file_extension.lower() == '.pdf':
-                with open(file_path, 'rb') as f:
-                    reader = PyPDF2.PdfReader(f)
-                    for page in reader.pages:
-                        text += page.extract_text() + "\n"
-            elif file_extension.lower() == '.docx':
-                doc = docx.Document(file_path)
-                for para in doc.paragraphs:
-                    text += para.text + "\n"
-            else:
-                text = ""
-        except Exception as e:
-            log.error("Ошибка при извлечении текста: %s", e)
-        return text
-
-    def call_giga_chat_api(self, text, prompt):
-        """
-        Отправка текста с дополнительным промтом в GigaChat API для получения оценки.
-        """
-        GIGACHAT_AUTH_KEY = getattr(settings,'GIGACHAT_AUTH_KEY', "")
-        auth_key = GIGACHAT_AUTH_KEY
-        client = GigaChat(credentials=auth_key,verify_ssl_certs=False, scope="GIGACHAT_API_PERS", model="GigaChat-Lite")
-
-        # Соединение промта и текста работы
-        full_prompt = prompt + "\n\nТекст работы:\n" + text
-        
-        try:
-            response = client.chat(
-                messages=[
-                    {"role": "system", "content": "Вы — помощник для оценки учебных работ."},
-                    {"role": "user", "content": full_prompt}
-                ]
-            )
-            
-            # Ответ модели хранится в content
-            reply = response.content.strip()
-            
-            # Попытка парсинга ответа как JSON
-            result_obj = json.loads(reply)
-            return result_obj
-        except Exception as e:
-            log.error("Ошибка при вызове GigaChat API: %s", e)
-            return {"score": 0, "comment": "Ошибка при обработке работы: " + str(e)}
-        
-    @XBlock.json_handler
-    def handle_upload(self, data, suffix=""):
-        """
-        Обработчик загрузки файла от студента.
-        Извлекает текст из файла, вызывает OpenAI API и сохраняет/отправляет результат.
-        """
-        # Получаем загруженный файл через self.request.params (метод зависит от настройки среды)
-        uploaded_file = self.request.params.get("uploaded_file")
-        if uploaded_file is None:
-            return {"error": "Файл не найден"}
-
-        # Определяем расширение файла
-        filename = uploaded_file.filename
-        _, ext = os.path.splitext(filename)
-        ext = ext.lower()
-        if ext not in ['.pdf', '.docx']:
-            return {"error": "Поддерживаются только файлы PDF и DOCX."}
-
-        # Сохраняем временную копию загруженного файла
-        temp_dir = tempfile.gettempdir()
-        file_path = os.path.join(temp_dir, filename)
-        with open(file_path, 'wb') as f:
-            f.write(uploaded_file.file.read())
-
-        # Извлекаем текст из файла
-        extracted_text = self.extract_text_from_file(file_path, ext)
-        if not extracted_text.strip():
-            return {"error": "Не удалось извлечь текст из файла."}
-
-        # Если у преподавателя установлены переопределённые оценка и комментарий – отдаём их
-        if self.overridden_score is not None:
-            final_result = {"score": self.overridden_score, "comment": self.overridden_comment}
-        else:
-            # Вызываем API для оценки работы
-            final_result = self.call_giga_chat_api(extracted_text, self.grading_prompt)
-        
-        # Сохраняем результат в состоянии пользователя
-        self.result = final_result
-
-        return json.dumps(final_result)
+            result = json.loads(raw)
+        except:
+            result = {'score': 0, 'comment': 'Invalid response'}
+        # store submission
+        self.submissions[student] = {
+            'file_name': uploaded.filename,
+            'file_url': uploaded.url,
+            'graded': True,
+            'approved': False,
+            'score': result['score'],
+            'comment': result['comment']
+        }
+        return Response(json_body={'status':'submitted'})
 
     @XBlock.json_handler
-    def studio_submit(self, data, suffix=""):
-        """
-        Обработчик сохранения настроек в Studio.
-        Позволяет задать новый промт и переопределённые оценку/комментарий.
-        """
-        try:
-            self.grading_prompt = data.get("grading_prompt", self.grading_prompt)
-            score = data.get("overridden_score")
-            if score != "":
-                self.overridden_score = float(score)
-            else:
-                self.overridden_score = None
-            self.overridden_comment = data.get("overridden_comment", self.overridden_comment)
-            return {"result": "success"}
-        except Exception as e:
-            log.error("Ошибка при сохранении настроек Studio: %s", e)
-            return {"error": str(e)}
+    def handle_override(self, data, suffix=''):
+        # process instructor changes
+        for user_id in self.submissions.keys():
+            score = data.get(f'score_{user_id}')
+            comment = data.get(f'comment_{user_id}')
+            approve = data.get(f'approve_{user_id}')
+            if score is not None:
+                self.submissions[user_id]['score'] = float(score)
+            if comment is not None:
+                self.submissions[user_id]['comment'] = comment
+            self.submissions[user_id]['approved'] = bool(approve)
+        # allow prompt/weight override
+        self.grading_prompt = data.get('grading_prompt', self.grading_prompt)
+        self.grade_weight = float(data.get('grade_weight', self.grade_weight))
+        return {'result':'success'}
 
-    # Функция для отладки, вызываемая при просмотре состояния XBlock
     def resource_string(self, path):
         import pkg_resources
         data = pkg_resources.resource_string(__name__, path)
-        return data.decode("utf8")
-    
+        return data.decode('utf8')
+
     @staticmethod
     def workbench_scenarios():
         """A canned scenario for display in the workbench."""
@@ -250,6 +169,12 @@ class GigaChatAIGradingXBlock(StudioEditableXBlockMixin, XBlock):
              """,
             ),
         ]
+
+    def get_real_user(self):
+        """returns session user"""
+        if user_service := self.runtime.service(self, 'user'):
+            return user_service.get_user_by_anonymous_id()
+        return None
 # def _test_xblock():
 #     """
 #     Функция для тестирования XBlock вне платформы edX.
@@ -263,3 +188,31 @@ class GigaChatAIGradingXBlock(StudioEditableXBlockMixin, XBlock):
 
 # if __name__ == "__main__":
 #     _test_xblock()
+    # def call_giga_chat_api(self, text, prompt):
+    #     """
+    #     Отправка текста с дополнительным промтом в GigaChat API для получения оценки.
+    #     """
+    #     GIGACHAT_AUTH_KEY = getattr(settings,'GIGACHAT_AUTH_KEY', "")
+    #     auth_key = GIGACHAT_AUTH_KEY
+    #     client = GigaChat(credentials=auth_key,verify_ssl_certs=False, scope="GIGACHAT_API_PERS", model="GigaChat-Lite")
+
+    #     # Соединение промта и текста работы
+    #     full_prompt = prompt + "\n\nТекст работы:\n" + text
+        
+    #     try:
+    #         response = client.chat(
+    #             messages=[
+    #                 {"role": "system", "content": "Вы — помощник для оценки учебных работ."},
+    #                 {"role": "user", "content": full_prompt}
+    #             ]
+    #         )
+            
+    #         # Ответ модели хранится в content
+    #         reply = response.content.strip()
+            
+    #         # Попытка парсинга ответа как JSON
+    #         result_obj = json.loads(reply)
+    #         return result_obj
+    #     except Exception as e:
+    #         log.error("Ошибка при вызове GigaChat API: %s", e)
+    #         return {"score": 0, "comment": "Ошибка при обработке работы: " + str(e)}
