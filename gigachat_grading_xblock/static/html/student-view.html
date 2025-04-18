@@ -1,8 +1,13 @@
 <div class="grading-xblock">
-  <form id="essay-upload-form" enctype="multipart/form-data">
-    <input type="file" id="essay-file" name="essay_file" accept=".pdf" required>
-    <button type="submit">Отправить</button>
-  </form>
+  <div class="file-upload">
+    <input type="file" id="essay-file" name="essay_file" required>
+  </div>
+  <span class="submit-attempt-container">
+  <a type="button" class="submit btn-brand" data-submitting="Отправка" data-value="Отправить" data-should-enable-submit-button="True">
+          <span class="submit-label">Отправить</span>
+      </a>
+    <a href="#" class="btn btn-inverse-outline-primary" id="submit-button">Отправить</a>
+  </span>
   <div id="grading-result" style="display: none;">
     <p>Оценка: <span id="score"></span></p>
     <p>Комментарий: <span id="comment"></span></p>

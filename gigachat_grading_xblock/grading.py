@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 
 
 class GigaChatAIGradingXBlock(StudioEditableXBlockMixin, XBlock):
-    editable_fields = ('grading_prompt', 'overridden_score', 'overridden_comment')
+    editable_fields = ('overridden_score', 'overridden_comment')
     """
     XBlock для проверки работ с помощью OpenAI API.
     """
