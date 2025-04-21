@@ -17,8 +17,12 @@
       Отправить
     </a>
   </div>
-  <div class="grading-block__result" id="result" style="">
-    <p class="grading-block__score">Оценка: <span id="score"></span></p>
-    <p class="grading-block__comment">Комментарий: <span id="comment"></span></p>
-  </div>
+<div class="grading-block__result" id="result">
+{% if approved %}
+{{approved}}
+{% else %}
+{{approved}}
+{%endif%}
+
+</div>
 </div>
